@@ -663,42 +663,6 @@ def list_bookings(
             logger.info(f"Limit parameter reduced from {limit} to 500")
             limit = 500  # Cap at 500 to prevent excessive queries
 
-        # Build base query
-        base_query = select(Booking)
-
-        # Apply mission/trip/boat/trip_type filter if provided (join via BookingItem, optionally Trip)
-        if mission_id or trip_id or boat_id or trip_type:
-            base_query = base_query.join(
-                BookingItem, BookingItem.booking_id == Booking.id
-            )
-            if mission_id or trip_type:
-                base_query = base_query.join(Trip, Trip.id == BookingItem.trip_id)
-                if mission_id:
-                    base_query = base_query.where(Trip.mission_id == mission_id)
-                if trip_type:
-                    base_query = base_query.where(Trip.type == trip_type)
-            if trip_id:
-                base_query = base_query.where(BookingItem.trip_id == trip_id)
-            if boat_id:
-                base_query = base_query.where(BookingItem.boat_id == boat_id)
-            base_query = base_query.distinct()
-            if mission_id:
-                logger.info(f"Filtering bookings by mission_id: {mission_id}")
-            if trip_id:
-                logger.info(f"Filtering bookings by trip_id: {trip_id}")
-            if boat_id:
-                logger.info(f"Filtering bookings by boat_id: {boat_id}")
-            if trip_type:
-                logger.info(f"Filtering bookings by trip_type: {trip_type}")
-
-        # Apply booking_status and payment_status filters if provided (list = include only those)
-        if booking_status:
-            base_query = base_query.where(Booking.booking_status.in_(booking_status))
-            logger.info(f"Filtering bookings by booking_status: {booking_status}")
-        if payment_status:
-            base_query = base_query.where(Booking.payment_status.in_(payment_status))
-            logger.info(f"Filtering bookings by payment_status: {payment_status}")
-
         # Apply text search on confirmation_code, name, email, phone (case-insensitive)
         search_term = search.strip() if search else ""
         if search_term:
@@ -710,7 +674,81 @@ def list_bookings(
                 Booking.user_email.ilike(pattern),
                 Booking.user_phone.ilike(pattern),
             )
-            base_query = base_query.where(search_cond)
+        else:
+            search_cond = None
+
+        # Build base query
+        # When we have join filters (mission/trip/boat/trip_type) AND sort by trip_name/trip_type,
+        # we must avoid SELECT DISTINCT + ORDER BY (expression not in SELECT) - PostgreSQL rejects it.
+        # Use a subquery for filtered booking IDs, then select Booking by id.
+        has_join_filters = mission_id or trip_id or boat_id or trip_type
+        sort_by_trip = sort_by in ("trip_name", "trip_type")
+        use_id_subquery = has_join_filters and sort_by_trip
+
+        if use_id_subquery:
+            # Subquery: distinct booking IDs matching all filters
+            id_subq = select(Booking.id).join(
+                BookingItem, BookingItem.booking_id == Booking.id
+            )
+            if mission_id or trip_type:
+                id_subq = id_subq.join(Trip, Trip.id == BookingItem.trip_id)
+                if mission_id:
+                    id_subq = id_subq.where(Trip.mission_id == mission_id)
+                if trip_type:
+                    id_subq = id_subq.where(Trip.type == trip_type)
+            if trip_id:
+                id_subq = id_subq.where(BookingItem.trip_id == trip_id)
+            if boat_id:
+                id_subq = id_subq.where(BookingItem.boat_id == boat_id)
+            if booking_status:
+                id_subq = id_subq.where(Booking.booking_status.in_(booking_status))
+            if payment_status:
+                id_subq = id_subq.where(Booking.payment_status.in_(payment_status))
+            if search_term:
+                id_subq = id_subq.where(search_cond)
+            id_subq = id_subq.distinct()
+            base_query = select(Booking).where(Booking.id.in_(id_subq))
+        else:
+            base_query = select(Booking)
+            if has_join_filters:
+                base_query = base_query.join(
+                    BookingItem, BookingItem.booking_id == Booking.id
+                )
+                if mission_id or trip_type:
+                    base_query = base_query.join(Trip, Trip.id == BookingItem.trip_id)
+                    if mission_id:
+                        base_query = base_query.where(Trip.mission_id == mission_id)
+                    if trip_type:
+                        base_query = base_query.where(Trip.type == trip_type)
+                if trip_id:
+                    base_query = base_query.where(BookingItem.trip_id == trip_id)
+                if boat_id:
+                    base_query = base_query.where(BookingItem.boat_id == boat_id)
+                base_query = base_query.distinct()
+            if booking_status:
+                base_query = base_query.where(
+                    Booking.booking_status.in_(booking_status)
+                )
+            if payment_status:
+                base_query = base_query.where(
+                    Booking.payment_status.in_(payment_status)
+                )
+            if search_term:
+                base_query = base_query.where(search_cond)
+
+        if mission_id:
+            logger.info(f"Filtering bookings by mission_id: {mission_id}")
+        if trip_id:
+            logger.info(f"Filtering bookings by trip_id: {trip_id}")
+        if boat_id:
+            logger.info(f"Filtering bookings by boat_id: {boat_id}")
+        if trip_type:
+            logger.info(f"Filtering bookings by trip_type: {trip_type}")
+        if booking_status:
+            logger.info(f"Filtering bookings by booking_status: {booking_status}")
+        if payment_status:
+            logger.info(f"Filtering bookings by payment_status: {payment_status}")
+        if search_term:
             logger.info(f"Filtering bookings by search: {search_term!r}")
 
         # Get total count first
@@ -754,7 +792,6 @@ def list_bookings(
             )
 
         # Apply sorting (trip_name/trip_type use first item's trip by display order)
-        sort_by_trip = sort_by in ("trip_name", "trip_type")
         if sort_by_trip:
             # Correlated subquery: trip name/type of first booking item (display order)
             first_item_trip = (
