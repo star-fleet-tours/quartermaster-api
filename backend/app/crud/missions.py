@@ -187,7 +187,9 @@ def get_missions_with_stats(
                     WHERE b.booking_status IN ('confirmed', 'checked_in', 'completed')
                     """
             ).bindparams(bindparam("trip_ids", expanding=True))
-            sales_row = session.exec(sales_statement, {"trip_ids": trip_ids}).first()
+            sales_row = session.exec(
+                sales_statement, params={"trip_ids": trip_ids}
+            ).first()
             total_sales = float(sales_row[0]) if sales_row is not None else 0.0  # cents
         else:
             total_bookings = 0

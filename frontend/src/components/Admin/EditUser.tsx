@@ -130,11 +130,11 @@ const EditUser = ({ user }: EditUserProps) => {
                     },
                     validate: (value) => {
                       if (!value) return true
-                      if (value.includes("'") || value.includes('"')) {
-                        return "Full name cannot contain quotes (single or double). Letters (including accented), numbers, spaces, and hyphens are allowed."
+                      if (value.includes('"')) {
+                        return "Full name cannot contain double quotes. Letters (including accented), numbers, spaces, hyphens, and apostrophes are allowed."
                       }
-                      if (!/^[\w\s-]+$/u.test(value)) {
-                        return "Full name can only contain letters (including accented), numbers, spaces, and hyphens"
+                      if (!/^[\w\s\-']+$/u.test(value)) {
+                        return "Full name can only contain letters (including accented), numbers, spaces, hyphens, and apostrophes"
                       }
                       return true
                     },
