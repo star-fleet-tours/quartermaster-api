@@ -105,17 +105,17 @@ def update_boat(
             detail=f"Boat with ID {boat_id} not found",
         )
 
-    # If capacity is being updated, ensure it is not below booked passengers
-    # for any trip-boat that uses the boat's default capacity (max_capacity is null)
+    # If capacity is being updated, ensure it is not below confirmed/checked-in
+    # passengers for any trip-boat that uses the boat's default capacity
+    # (drafts do not consume capacity)
     if boat_in.capacity is not None:
         trip_boats = crud.get_trip_boats_by_boat(session=session, boat_id=boat_id)
         for tb in trip_boats:
             if tb.max_capacity is None:
-                booked = crud.get_ticket_item_count_for_trip_boat(
-                    session=session,
-                    trip_id=tb.trip_id,
-                    boat_id=boat_id,
+                paid_counts = crud.get_paid_ticket_count_per_boat_for_trip(
+                    session=session, trip_id=tb.trip_id
                 )
+                booked = paid_counts.get(boat_id, 0)
                 if booked > boat_in.capacity:
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,

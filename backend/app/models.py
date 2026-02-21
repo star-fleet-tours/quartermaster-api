@@ -738,8 +738,10 @@ class TripBoat(TripBoatBase, table=True):
     # Relationships
     trip: "Trip" = Relationship(back_populates="trip_boats")
     boat: "Boat" = Relationship()
-    # Per-trip, per-boat price overrides
-    pricing: list["TripBoatPricing"] = Relationship(back_populates="trip_boat")
+    # Per-trip, per-boat price overrides (cascade delete when trip boat is removed)
+    pricing: list["TripBoatPricing"] = Relationship(
+        back_populates="trip_boat", cascade_delete=True
+    )
 
 
 class TripBoatPublic(TripBoatBase):

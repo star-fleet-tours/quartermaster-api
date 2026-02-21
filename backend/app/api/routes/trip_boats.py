@@ -49,13 +49,13 @@ def create_trip_boat(
             detail=f"Boat with ID {trip_boat_in.boat_id} not found",
         )
 
-    # If setting custom capacity, it must not be below already booked on this trip/boat
+    # If setting custom capacity, it must not be below confirmed/checked-in bookings
+    # (drafts do not consume capacity)
     if trip_boat_in.max_capacity is not None:
-        booked = crud.get_ticket_item_count_for_trip_boat(
-            session=session,
-            trip_id=trip_boat_in.trip_id,
-            boat_id=trip_boat_in.boat_id,
+        paid_counts = crud.get_paid_ticket_count_per_boat_for_trip(
+            session=session, trip_id=trip_boat_in.trip_id
         )
+        booked = paid_counts.get(trip_boat_in.boat_id, 0)
         if trip_boat_in.max_capacity < booked:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -203,7 +203,8 @@ def update_trip_boat(
                 detail=f"Boat with ID {trip_boat_in.boat_id} not found",
             )
 
-    # If setting custom capacity, it must not be below already booked on this trip/boat
+    # If setting custom capacity, it must not be below confirmed/checked-in bookings
+    # (drafts do not consume capacity)
     if trip_boat_in.max_capacity is not None:
         trip_id = (
             trip_boat_in.trip_id
@@ -215,11 +216,10 @@ def update_trip_boat(
             if trip_boat_in.boat_id is not None
             else trip_boat.boat_id
         )
-        booked = crud.get_ticket_item_count_for_trip_boat(
-            session=session,
-            trip_id=trip_id,
-            boat_id=boat_id,
+        paid_counts = crud.get_paid_ticket_count_per_boat_for_trip(
+            session=session, trip_id=trip_id
         )
+        booked = paid_counts.get(boat_id, 0)
         if trip_boat_in.max_capacity < booked:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,

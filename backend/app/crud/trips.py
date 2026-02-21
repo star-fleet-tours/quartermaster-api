@@ -125,15 +125,32 @@ def get_trips_with_stats(
             .where(Booking.booking_status.in_(["confirmed", "checked_in", "completed"]))
         )
         total_bookings = session.exec(bookings_statement).first() or 0
-        # Sum total sales for this trip (cents), excluding tax
-        sales_statement = (
-            select(func.sum(Booking.total_amount - Booking.tax_amount))
-            .select_from(Booking)
-            .join(BookingItem, Booking.id == BookingItem.booking_id)
-            .where(BookingItem.trip_id == trip_id)
-            .where(Booking.booking_status.in_(["confirmed", "checked_in", "completed"]))
-        )
-        total_sales = session.exec(sales_statement).first() or 0
+        # Sum total sales for this trip (cents), excluding tax.
+        # Use proportional allocation: when a booking has multiple items (same or different trips),
+        # attribute (trip_item_subtotal / booking_subtotal) * (total_amount - tax_amount) to this trip.
+        # This avoids double-counting when one booking has multiple items for the same trip.
+        sales_statement = text(
+            """
+            SELECT COALESCE(SUM(
+                CASE WHEN b.subtotal > 0
+                THEN (trip_items.trip_item_subtotal::float / b.subtotal)
+                     * (b.total_amount - b.tax_amount)
+                ELSE 0 END
+            ), 0)::bigint
+            FROM (
+                SELECT bi.booking_id,
+                       SUM(bi.quantity * bi.price_per_unit) AS trip_item_subtotal
+                FROM bookingitem bi
+                WHERE bi.trip_id = :trip_id
+                  AND bi.status IN ('active', 'fulfilled')
+                GROUP BY bi.booking_id
+            ) trip_items
+            JOIN booking b ON b.id = trip_items.booking_id
+            WHERE b.booking_status IN ('confirmed', 'checked_in', 'completed')
+            """
+        ).params(trip_id=trip_id)
+        sales_row = session.exec(sales_statement).first()
+        total_sales = int(sales_row[0]) if sales_row is not None else 0
 
         trips_data.append(
             {
@@ -152,7 +169,7 @@ def get_trips_with_stats(
                 "updated_at": row[12],
                 "timezone": row[13] or "UTC",
                 "total_bookings": total_bookings,
-                "total_sales": int(total_sales) if total_sales is not None else 0,
+                "total_sales": total_sales,
             }
         )
 

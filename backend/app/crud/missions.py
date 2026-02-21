@@ -4,7 +4,7 @@ Mission CRUD operations.
 
 import uuid
 
-from sqlalchemy import func
+from sqlalchemy import bindparam, func
 from sqlmodel import Session, select, text
 
 from app.models import (
@@ -164,18 +164,31 @@ def get_missions_with_stats(
             )
             total_bookings = session.exec(bookings_statement).first() or 0
 
-            # Sum total sales for this mission's trips (excluding tax)
-            # Only include confirmed, checked_in, and completed bookings (actual revenue)
-            sales_statement = (
-                select(func.sum(Booking.total_amount - Booking.tax_amount))
-                .select_from(Booking)
-                .join(BookingItem, Booking.id == BookingItem.booking_id)
-                .where(BookingItem.trip_id.in_(trip_ids))
-                .where(
-                    Booking.booking_status.in_(["confirmed", "checked_in", "completed"])
-                )
-            )
-            total_sales = session.exec(sales_statement).first() or 0  # cents
+            # Sum total sales for this mission's trips (excluding tax).
+            # Use proportional allocation to avoid double-counting when a booking
+            # has multiple items for the same trip or items across multiple trips.
+            sales_statement = text(
+                """
+                    SELECT COALESCE(SUM(
+                        CASE WHEN b.subtotal > 0
+                        THEN (trip_items.trip_item_subtotal::float / b.subtotal)
+                             * (b.total_amount - b.tax_amount)
+                        ELSE 0 END
+                    ), 0)
+                    FROM (
+                        SELECT bi.booking_id,
+                               SUM(bi.quantity * bi.price_per_unit) AS trip_item_subtotal
+                        FROM bookingitem bi
+                        WHERE bi.trip_id IN :trip_ids
+                          AND bi.status IN ('active', 'fulfilled')
+                        GROUP BY bi.booking_id
+                    ) trip_items
+                    JOIN booking b ON b.id = trip_items.booking_id
+                    WHERE b.booking_status IN ('confirmed', 'checked_in', 'completed')
+                    """
+            ).bindparams(bindparam("trip_ids", expanding=True))
+            sales_row = session.exec(sales_statement, {"trip_ids": trip_ids}).first()
+            total_sales = float(sales_row[0]) if sales_row is not None else 0.0  # cents
         else:
             total_bookings = 0
             total_sales = 0  # cents
