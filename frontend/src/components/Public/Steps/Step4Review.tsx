@@ -266,6 +266,17 @@ const Step4Review = ({
     console.error("Payment failed:", error.message)
   }
 
+  // When restored from bfcache (mobile reload), re-fetch booking by code. If confirmed, navigate to
+  // confirmation. Fixes stuck "Processing Payment" on mobile where reload restores frozen state.
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (!e.persisted || !urlCode) return
+      loadByCodeMutation.mutate(urlCode)
+    }
+    window.addEventListener("pageshow", onPageShow)
+    return () => window.removeEventListener("pageshow", onPageShow)
+  }, [urlCode])
+
   // When we have bookingResult but URL has no code, add code for bookmarking (after create success).
   useEffect(() => {
     const code = bookingResult?.booking?.confirmation_code
