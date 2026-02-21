@@ -89,8 +89,28 @@ const AddBoat = ({ isOpen, onClose, onSuccess }: AddBoatProps) => {
       capacity: data.capacity,
       provider_id: data.provider_id,
     }
+    const totalPendingCapacity = pendingPricing.reduce((sum, row) => {
+      const cap = Number.parseInt(row.capacity, 10)
+      if (
+        !row.ticket_type.trim() ||
+        Number.isNaN(Number.parseFloat(row.price)) ||
+        Number.isNaN(cap) ||
+        cap < 0
+      )
+        return sum
+      return sum + cap
+    }, 0)
+    if (totalPendingCapacity > boatPayload.capacity) {
+      handleError({
+        body: {
+          detail: `Sum of ticket-type capacities (${totalPendingCapacity}) would exceed boat capacity (${boatPayload.capacity})`,
+        },
+      } as ApiError)
+      return
+    }
     createBoatMutation.mutate(boatPayload, {
       onSuccess: async (boat) => {
+        let pricingFailed = false
         for (const row of pendingPricing) {
           const priceCents = Math.round(Number.parseFloat(row.price) * 100)
           const cap = Number.parseInt(row.capacity, 10)
@@ -112,8 +132,12 @@ const AddBoat = ({ isOpen, onClose, onSuccess }: AddBoatProps) => {
             })
           } catch (err) {
             handleError(err as ApiError)
+            pricingFailed = true
+            queryClient.invalidateQueries({ queryKey: ["boats"] })
+            break
           }
         }
+        if (pricingFailed) return
         queryClient.invalidateQueries({ queryKey: ["boat-pricing"] })
         showSuccessToast("Boat created successfully.")
         reset()

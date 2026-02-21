@@ -440,15 +440,8 @@ const Step1TripSelection = ({
     return `${readableType} (${time})`
   }
 
-  const formatLaunchOptionLabel = (launch: {
-    name: string
-    launch_timestamp: string
-    timezone?: string | null
-  }): string => {
-    const dateStr = formatTripTime(launch.launch_timestamp, launch.timezone)
-    return launch.name?.trim()
-      ? `${launch.name.trim()} (${dateStr})`
-      : dateStr
+  const formatLaunchOptionLabel = (launch: { name: string }): string => {
+    return launch.name?.trim() || "Mission"
   }
 
   // Create collection for launch selection (only launches with visible trips)
