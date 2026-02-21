@@ -239,7 +239,7 @@ const Step3CustomerInfo = ({
                       field.onChange(checked === true)
                     }
                   >
-                    Send me launch updates and schedule changes
+                    Send me updates about this launch
                   </Checkbox>
                 )}
               />
