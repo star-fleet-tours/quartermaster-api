@@ -106,6 +106,7 @@ from .providers import (
     update_provider,
 )
 from .trip_boat_pricing import (
+    cascade_trip_boat_ticket_type_rename,
     create_trip_boat_pricing,
     delete_trip_boat_pricing,
     get_trip_boat_pricing,
@@ -255,6 +256,7 @@ __all__ = [
     "get_boat_pricing_by_boat",
     "update_boat_pricing",
     # Trip Boat Pricing
+    "cascade_trip_boat_ticket_type_rename",
     "create_trip_boat_pricing",
     "delete_trip_boat_pricing",
     "get_trip_boat_pricing",

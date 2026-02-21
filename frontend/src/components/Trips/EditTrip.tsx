@@ -346,7 +346,7 @@ const EditTrip = ({
         requestBody: {
           ticket_type: body.ticket_type,
           price: body.price,
-          capacity: body.capacity ?? undefined,
+          ...(body.capacity !== undefined ? { capacity: body.capacity } : {}),
         },
       }),
     onSuccess: () => {

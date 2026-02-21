@@ -144,7 +144,7 @@ const EditBoat = ({ boat }: EditBoatProps) => {
         requestBody: {
           ticket_type: body.ticket_type,
           price: body.price,
-          capacity: body.capacity,
+          ...(body.capacity !== undefined ? { capacity: body.capacity } : {}),
         },
       }),
     onSuccess: () => {
