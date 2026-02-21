@@ -94,9 +94,6 @@ const EditTrip = ({
   const dep = parseApiDate(trip.departure_time)
   const board = parseApiDate(trip.boarding_time)
   const checkIn = parseApiDate(trip.check_in_time)
-  // Editable up to 24h after departure (for delays/scrubs)
-  const editableUntil = new Date(dep.getTime() + 24 * 60 * 60 * 1000)
-  const isPast = new Date() > editableUntil
   const [departureTime, setDepartureTime] = useState(
     formatInLocationTimezone(dep, tz),
   )
@@ -677,12 +674,6 @@ const EditTrip = ({
               variant="ghost"
               size="sm"
               color="dark.accent.primary"
-              disabled={isPast}
-              title={
-                isPast
-                  ? "This trip is no longer editable (more than 24 hours after departure)"
-                  : ""
-              }
             >
               <FiEdit fontSize="16px" />
               {triggerLabel}
@@ -702,12 +693,6 @@ const EditTrip = ({
               <DialogTitle>Edit Trip</DialogTitle>
             </DialogHeader>
             <DialogBody>
-              {isPast && (
-                <Text mb={4} color="orange.500">
-                  This trip is no longer editable (more than 24 hours after
-                  departure). Contact an administrator if you need to change it.
-                </Text>
-              )}
               <Tabs.Root defaultValue={initialTab} variant="subtle">
                 <Tabs.List>
                   <Tabs.Trigger value="basic-info">Basic Info</Tabs.Trigger>
@@ -722,7 +707,7 @@ const EditTrip = ({
                         id="mission_id"
                         value={missionId}
                         onChange={setMissionId}
-                        isDisabled={mutation.isPending || isPast}
+                        isDisabled={mutation.isPending}
                         portalRef={contentRef}
                       />
                     </Field>
@@ -736,7 +721,7 @@ const EditTrip = ({
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder="Trip name (optional)"
-                        disabled={mutation.isPending || isPast}
+                        disabled={mutation.isPending}
                       />
                     </Field>
 
@@ -747,7 +732,7 @@ const EditTrip = ({
                         onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
                           setType(e.target.value)
                         }
-                        disabled={mutation.isPending || isPast}
+                        disabled={mutation.isPending}
                       >
                         <option value="launch_viewing">Launch Viewing</option>
                         <option value="pre_launch">Pre-Launch</option>
@@ -764,7 +749,7 @@ const EditTrip = ({
                         onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
                           setBookingMode(e.target.value)
                         }
-                        disabled={mutation.isPending || isPast}
+                        disabled={mutation.isPending}
                       >
                         <option value="private">Private (Admin Only)</option>
                         <option value="early_bird">
@@ -786,7 +771,7 @@ const EditTrip = ({
                         value={salesOpenAt}
                         onChange={(e) => setSalesOpenAt(e.target.value)}
                         placeholder={`Enter time in ${tz}`}
-                        disabled={mutation.isPending || isPast}
+                        disabled={mutation.isPending}
                       />
                     </Field>
 
@@ -802,7 +787,7 @@ const EditTrip = ({
                         value={departureTime}
                         onChange={(e) => setDepartureTime(e.target.value)}
                         placeholder={`Enter time in ${tz}`}
-                        disabled={mutation.isPending || isPast}
+                        disabled={mutation.isPending}
                       />
                     </Field>
 
@@ -823,7 +808,7 @@ const EditTrip = ({
                             ),
                           )
                         }
-                        disabled={mutation.isPending || isPast}
+                        disabled={mutation.isPending}
                       />
                     </Field>
 
@@ -844,7 +829,7 @@ const EditTrip = ({
                             ),
                           )
                         }
-                        disabled={mutation.isPending || isPast}
+                        disabled={mutation.isPending}
                       />
                     </Field>
 
@@ -855,16 +840,11 @@ const EditTrip = ({
                         width="100%"
                       >
                         <Text>Active</Text>
-                        <Box
-                          onClick={() => {
-                            if (!isPast) setActive(!active)
-                          }}
-                          cursor={isPast ? "not-allowed" : "pointer"}
-                          opacity={isPast ? 0.5 : 1}
-                        >
+                        <Box>
                           <Switch
                             checked={active}
-                            disabled={mutation.isPending || isPast}
+                            onCheckedChange={({ checked }) => setActive(checked === true)}
+                            disabled={mutation.isPending}
                             inputProps={{ id: "active" }}
                           />
                         </Box>
@@ -879,16 +859,11 @@ const EditTrip = ({
                         width="100%"
                       >
                         <Text>Unlisted</Text>
-                        <Box
-                          onClick={() => {
-                            if (!isPast) setUnlisted(!unlisted)
-                          }}
-                          cursor={isPast ? "not-allowed" : "pointer"}
-                          opacity={isPast ? 0.5 : 1}
-                        >
+                        <Box>
                           <Switch
                             checked={unlisted}
-                            disabled={mutation.isPending || isPast}
+                            onCheckedChange={({ checked }) => setUnlisted(checked === true)}
+                            disabled={mutation.isPending}
                             inputProps={{ id: "unlisted" }}
                           />
                         </Box>
@@ -1284,64 +1259,89 @@ const EditTrip = ({
                                       const isEditing =
                                         editingOverrideId === p.id
                                       return (
-                                        <HStack
+                                        <Box
                                           key={p.id}
-                                          justify="space-between"
                                           p={2}
                                           borderWidth="1px"
                                           borderRadius="md"
                                           borderColor="gray.600"
                                         >
-                                          <HStack flex={1} gap={2}>
-                                            <Text fontWeight="medium">
-                                              {p.ticket_type}
-                                            </Text>
-                                            {isEditing ? (
-                                              <>
-                                                <Input
-                                                  size="sm"
-                                                  width="24"
-                                                  value={
-                                                    editingOverrideTicketType
-                                                  }
-                                                  onChange={(e) =>
+                                          {isEditing ? (
+                                            <VStack
+                                              align="stretch"
+                                              gap={2}
+                                              width="100%"
+                                              minWidth={0}
+                                            >
+                                              <HStack
+                                                gap={2}
+                                                flexWrap="wrap"
+                                                align="flex-end"
+                                              >
+                                                <Field label="Ticket type" flex="1 1 120px" minWidth="100px">
+                                                  <Input
+                                                    size="sm"
+                                                    value={
+                                                      editingOverrideTicketType
+                                                    }
+                                                    onChange={(e) =>
+                                                      setEditingOverrideTicketType(
+                                                        e.target.value,
+                                                      )
+                                                    }
+                                                    placeholder="e.g. VIP, Premium"
+                                                  />
+                                                </Field>
+                                                <Field label="Price ($)" flex="1 1 80px" minWidth="70px">
+                                                  <Input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    size="sm"
+                                                    value={editingOverridePrice}
+                                                    onChange={(e) =>
+                                                      setEditingOverridePrice(
+                                                        e.target.value,
+                                                      )
+                                                    }
+                                                    placeholder="0.00"
+                                                  />
+                                                </Field>
+                                                <Field label="Capacity (opt)" flex="1 1 70px" minWidth="60px">
+                                                  <Input
+                                                    type="number"
+                                                    min="0"
+                                                    size="sm"
+                                                    value={
+                                                      editingOverrideCapacity
+                                                    }
+                                                    onChange={(e) =>
+                                                      setEditingOverrideCapacity(
+                                                        e.target.value,
+                                                      )
+                                                    }
+                                                    placeholder="—"
+                                                    title="Capacity override (optional)"
+                                                  />
+                                                </Field>
+                                              </HStack>
+                                              <HStack justify="flex-end" gap={2}>
+                                                <Button
+                                                  size="xs"
+                                                  variant="ghost"
+                                                  onClick={() => {
+                                                    setEditingOverrideId(null)
                                                     setEditingOverrideTicketType(
-                                                      e.target.value,
+                                                      "",
                                                     )
-                                                  }
-                                                  placeholder="Ticket type"
-                                                />
-                                                <Input
-                                                  type="number"
-                                                  step="0.01"
-                                                  min="0"
-                                                  size="sm"
-                                                  width="24"
-                                                  value={editingOverridePrice}
-                                                  onChange={(e) =>
-                                                    setEditingOverridePrice(
-                                                      e.target.value,
-                                                    )
-                                                  }
-                                                  placeholder="0.00"
-                                                />
-                                                <Text fontSize="sm">$</Text>
-                                                <Input
-                                                  type="number"
-                                                  min="0"
-                                                  size="sm"
-                                                  width="16"
-                                                  value={
-                                                    editingOverrideCapacity
-                                                  }
-                                                  onChange={(e) =>
+                                                    setEditingOverridePrice("")
                                                     setEditingOverrideCapacity(
-                                                      e.target.value,
+                                                      "",
                                                     )
-                                                  }
-                                                  placeholder="Cap"
-                                                  title="Capacity override (optional)"
-                                                />
+                                                  }}
+                                                >
+                                                  Cancel
+                                                </Button>
                                                 <Button
                                                   size="xs"
                                                   onClick={() => {
@@ -1398,36 +1398,31 @@ const EditTrip = ({
                                                 >
                                                   Save
                                                 </Button>
-                                                <Button
-                                                  size="xs"
-                                                  variant="ghost"
-                                                  onClick={() => {
-                                                    setEditingOverrideId(null)
-                                                    setEditingOverrideTicketType(
-                                                      "",
-                                                    )
-                                                    setEditingOverridePrice("")
-                                                    setEditingOverrideCapacity(
-                                                      "",
-                                                    )
-                                                  }}
+                                              </HStack>
+                                            </VStack>
+                                          ) : (
+                                            <HStack
+                                              justify="space-between"
+                                              align="center"
+                                              flex={1}
+                                              gap={2}
+                                            >
+                                              <HStack gap={2} flex={1} minWidth={0}>
+                                                <Text fontWeight="medium">
+                                                  {p.ticket_type}
+                                                </Text>
+                                                <Text
+                                                  fontSize="sm"
+                                                  color="gray.500"
                                                 >
-                                                  Cancel
-                                                </Button>
-                                              </>
-                                            ) : (
-                                              <Text
-                                                fontSize="sm"
-                                                color="gray.500"
-                                              >
-                                                ${formatCents(p.price)}{" "}
-                                                (override)
-                                                {p.capacity != null
-                                                  ? `, ${p.capacity} seats`
-                                                  : ""}
-                                              </Text>
-                                            )}
-                                          </HStack>
+                                                  ${formatCents(p.price)}
+                                                  {!useOnlyTripPricing &&
+                                                    " (override)"}
+                                                  {p.capacity != null
+                                                    ? `, ${p.capacity} seats`
+                                                    : ""}
+                                                </Text>
+                                              </HStack>
                                           {!isEditing && (
                                             <HStack gap={1}>
                                               <Button
@@ -1470,6 +1465,8 @@ const EditTrip = ({
                                             </HStack>
                                           )}
                                         </HStack>
+                                          )}
+                                        </Box>
                                       )
                                     })}
                                     {tripBoatPricingList.length === 0 &&
@@ -1721,7 +1718,7 @@ const EditTrip = ({
                             onChange={(
                               e: React.ChangeEvent<HTMLSelectElement>,
                             ) => setSelectedBoatId(e.target.value)}
-                            disabled={mutation.isPending || isPast}
+                            disabled={mutation.isPending}
                           >
                             <option value="">Select a boat</option>
                             {boatsData.map((boat) => (
@@ -2018,7 +2015,6 @@ const EditTrip = ({
                   type="submit"
                   loading={mutation.isPending}
                   disabled={
-                    isPast ||
                     !missionId ||
                     !departureTime ||
                     mutation.isPending
