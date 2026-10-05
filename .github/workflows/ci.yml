@@ -10,7 +10,7 @@ jobs:
   backend-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install uv
         uses: astral-sh/setup-uv@v8.2.0
@@ -54,7 +54,7 @@ jobs:
       RUN_INITIAL_DATA: "1"
       CI: "1"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Create .env for Docker Compose
         run: cp .env.ci .env
@@ -80,7 +80,7 @@ jobs:
   frontend-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -104,7 +104,7 @@ jobs:
       VITE_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
       VITE_PUBLIC_BOOKING_BASE_URL: http://localhost:5173
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -148,7 +148,7 @@ jobs:
       RUN_INITIAL_DATA: "1"
       CI: "1"
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Create .env for Docker Compose
         run: cp .env.ci .env
